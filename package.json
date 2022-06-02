@@ -3,6 +3,7 @@
   "main": "bot.ts",
   "dependencies": {
     "@slack/bolt": "^3.8.1",
+    "googleapis": "^100.0.0",
     "slack-block-builder": "^2.5.0",
     "ts-node": "^10.4.0",
     "typescript": "^4.5.4"

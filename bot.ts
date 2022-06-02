@@ -1,6 +1,7 @@
-import {App} from '@slack/bolt';
-import {Actions, Header, Input, Message, Modal, Option, Section, StaticSelect, TextInput} from 'slack-block-builder';
-import {createSectionBlocks} from './util/slack';
+import {App, UsersSelectAction} from '@slack/bolt';
+import {WebClient} from '@slack/web-api';
+import {Actions, Header, Input, Message, Modal, Section, TextInput, UserSelect} from 'slack-block-builder';
+import {getInfo} from './util/sheets';
 import { signingSecret, token, port } from './config';
 
 
@@ -9,9 +10,79 @@ const app = new App({
     token
 });
 
+// /info
+// Gets contact info for a given user, or yourself if no user was provided.
+app.command('/info', async ({command, ack, client, respond}) => {
+    await ack();
+    let user = command.user_id;
+
+    // TODO: consider abstracting argument parsing
+    // I don't think this application needs a massive and somewhat scary pattern-based argParser like what RBot has,
+    // but perhaps some abstraction would be nice.
+    const args = command.text.match(/("(?:[^"\\]|\\.)*")|\S+/g);
+    if (args?.length) {
+        const id = args[0].match(/^<@(.+)\|\w+>$/)?.[1];
+        if (!id) return respond('The provided argument was not a valid user.');
+        user = id;
+    }
+
+    const message = await infoResponse(client, user);
+    await respond(message);
+});
+
+app.action('info-select', async ({ack, payload, client, respond}) => {
+    await ack();
+    const user = (payload as UsersSelectAction).selected_user;
+    const message = await infoResponse(client, user);
+    await respond(message);
+});
+
+async function infoResponse(client: WebClient, id: string) {
+    const res = await client.users.info({ token, user: id });
+    if (!res.user?.real_name) return Message()
+        .blocks(
+            Header({text: 'There was an error fetching your name.'}),
+            Section({text: 'If this issue persists, please message <@U03GQC0A9MJ>.'})
+        )
+        .buildToObject()
+
+    const info = await getInfo(res.user.real_name);
+    if (!info) return Message()
+        .blocks(
+            Header({text: `${res.user.real_name} was not found on the contacts spreadsheet.`}),
+            Section({text: 'If this is a mistake, please message <@U03GQC0A9MJ>.'}),
+            Actions().elements(
+                UserSelect({actionId: 'info-select', placeholder: 'Select a user', initialUser: id})
+            )
+        )
+        .buildToObject()
+
+    const [lastName, firstName, position, email, cell, home] = info;
+    const fields = [`*Email:*\n${email}`];
+    if (cell) fields.push(`*Cell phone:*\n${parseCellPhone(cell)}`);
+    if (home) fields.push(`*Home phone:*\n${parseCellPhone(home)}`);
+
+    return Message()
+        .blocks(
+            Header({text: `Contact info for ${firstName} ${lastName} (${position})`}),
+            Section().fields(fields),
+            Actions().elements(
+                UserSelect({actionId: 'info-select', placeholder: 'Select a user', initialUser: id})
+            )
+        )
+        .buildToObject()
+}
+
+// Parses an unformatted phone number entry to be in `(650) 000-0000` format.
+function parseCellPhone(phone: string) {
+    if (!phone.match(/\d+/)) return phone;
+    const [, code, first, second] = phone.match(/(\d{3})(\d{3})(\d{0,4})/)!;
+    return `(${code}) ${first}-${second}`;
+}
+
 // /test
 // Tests.
-app.command('/test', async ({command, ack, respond}) => {
+app.command('/test', async ({ack, respond}) => {
     await ack();
     await respond(
         Message()
@@ -23,7 +94,7 @@ app.command('/test', async ({command, ack, respond}) => {
     );
 });
 
-app.command('/modaltest', async ({command, ack, client, payload}) => {
+app.command('/modaltest', async ({ack, client, payload}) => {
     await ack();
     const modal = Modal({title: 'This is a modal.', submit: 'Submit', callbackId: 'test-modal'})
         .blocks(
