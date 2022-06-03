@@ -2,6 +2,7 @@ import {App, UsersSelectAction} from '@slack/bolt';
 import {WebClient} from '@slack/web-api';
 import {Actions, Header, Input, Message, Modal, Section, TextInput, UserSelect} from 'slack-block-builder';
 import {getInfo} from './util/sheets';
+import {capitalize, parseCellPhone} from './util/parsing';
 import { signingSecret, token, port } from './config';
 
 
@@ -64,20 +65,13 @@ async function infoResponse(client: WebClient, id: string) {
 
     return Message()
         .blocks(
-            Header({text: `Contact info for ${firstName} ${lastName} (${position})`}),
+            Header({text: `Contact info for ${capitalize(firstName)} ${capitalize(lastName)} (${position})`}),
             Section().fields(fields),
             Actions().elements(
                 UserSelect({actionId: 'info-select', placeholder: 'Select a user', initialUser: id})
             )
         )
         .buildToObject()
-}
-
-// Parses an unformatted phone number entry to be in `(650) 000-0000` format.
-function parseCellPhone(phone: string) {
-    if (!phone.match(/\d+/)) return phone;
-    const [, code, first, second] = phone.match(/(\d{3})(\d{3})(\d{0,4})/)!;
-    return `(${code}) ${first}-${second}`;
 }
 
 // /test

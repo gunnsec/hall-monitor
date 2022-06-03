@@ -1,12 +1,15 @@
 # hall monitor
 Slack bot for Official SEC Business.
 
-To run locally, create a `config.ts` in the root directory which exports your slack signing secret, bot user token, and port:
+To run locally, create a `config.ts` in the root directory which exports your slack signing secret, bot user token, port,
+and contact info spreadsheet id:
 ```ts
 // config.ts
 export const signingSecret = 'legitimate-slack-signing-secret';
 export const token = 'xoxb-also-legitimate-slack-token';
 export const port = 3000;
+
+export const spreadsheetId = 'contact-info-sheet-id';
 ```
 Install dependencies with `npm install` and run `npm start` to run the bot.
 
