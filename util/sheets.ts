@@ -20,8 +20,8 @@ export async function getInfo(name: string): Promise<string[] | undefined> {
     if (!res.data.values) return;
 
     const first = name.split(' ')[0];
-    const data = res.data.values.find(row => row[1].toLowerCase() === first.toLowerCase());
+    const data = res.data.values.find(row => row[1].trim().toLowerCase() === first.toLowerCase());
     if (!data) return;
 
-    return data;
+    return data.map(x => x.trim());
 }
