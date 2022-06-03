@@ -11,8 +11,8 @@ const app = new App({
     token
 });
 
-// /info
-// Gets contact info for a given user, or yourself if no user was provided.
+// /info @[user]?
+// Gets the contact info of a given user, or yourself if no user was provided.
 app.command('/info', async ({command, ack, client, respond}) => {
     await ack();
     let user = command.user_id;
@@ -74,15 +74,19 @@ async function infoResponse(client: WebClient, id: string) {
         .buildToObject()
 }
 
-// /test
-// Tests.
-app.command('/test', async ({ack, respond}) => {
+// /help
+// Sends info about other commands.
+app.command('/help', async ({ack, respond}) => {
     await ack();
     await respond(
         Message()
             .blocks(
-                Header({text: 'Test.'}),
-                Section({text: 'This is a test. Do not panic.'})
+                Header({text: 'Help — Commands'}),
+                Section({text: 'This bot is open sourced on GitHub! View the source code <https://github.com/ky28059/hall-monitor|here>.'}),
+                Section().fields(
+                    '*/help*\nSends info about other commands.',
+                    '*/info @[user]?*\nGets the contact info of a given user.'
+                )
             )
             .buildToObject()
     );
