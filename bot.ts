@@ -1,4 +1,4 @@
-import {App, UsersSelectAction} from '@slack/bolt';
+import {App, MessageShortcut, UsersSelectAction} from '@slack/bolt';
 import {WebClient} from '@slack/web-api';
 import {Actions, Header, Input, Message, Modal, Section, TextInput, UserSelect} from 'slack-block-builder';
 import {getInfo} from './util/sheets';
@@ -38,6 +38,14 @@ app.action('info-select', async ({ack, payload, client, respond}) => {
     await respond(message);
 });
 
+app.shortcut('info-shortcut', async ({ack, payload, client, shortcut}) => {
+    await ack();
+    const user = (shortcut as MessageShortcut).message.user;
+    if (!user) return;
+    const modal = await infoModal(client, user);
+    await client.views.open({trigger_id: payload.trigger_id, view: modal});
+});
+
 async function infoResponse(client: WebClient, id: string) {
     const res = await client.users.info({ token, user: id });
     if (!res.user?.real_name) return Message()
@@ -70,6 +78,39 @@ async function infoResponse(client: WebClient, id: string) {
             Actions().elements(
                 UserSelect({actionId: 'info-select', placeholder: 'Select a user', initialUser: id})
             )
+        )
+        .buildToObject()
+}
+
+// TODO: this can probably be abstracted further with the function above;
+// a common function might return only the block kit blocks passed to `.blocks(...)`,
+// but because the message has a dropdown and the modal does not this wouldn't quite work.
+async function infoModal(client: WebClient, id: string) {
+    const res = await client.users.info({ token, user: id });
+    if (!res.user?.real_name) return Modal({title: 'SEC contact info'})
+        .blocks(
+            Header({text: 'There was an error fetching your name.'}),
+            Section({text: 'If this issue persists, please message <@U03GQC0A9MJ>.'})
+        )
+        .buildToObject()
+
+    const info = await getInfo(res.user.real_name);
+    if (!info) return Modal({title: 'SEC contact info'})
+        .blocks(
+            Header({text: `${res.user.real_name} was not found on the contacts spreadsheet.`}),
+            Section({text: 'If this is a mistake, please message <@U03GQC0A9MJ>.'})
+        )
+        .buildToObject()
+
+    const [lastName, firstName, position, email, cell, home] = info;
+    const fields = [`*Email:*\n${email}`];
+    if (cell) fields.push(`*Cell phone:*\n${parseCellPhone(cell)}`);
+    if (home) fields.push(`*Home phone:*\n${parseCellPhone(home)}`);
+
+    return Modal({title: 'SEC contact info'})
+        .blocks(
+            Header({text: `Contact info for ${capitalize(firstName)} ${capitalize(lastName)} (${position})`}),
+            Section().fields(fields)
         )
         .buildToObject()
 }
