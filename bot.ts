@@ -1,6 +1,8 @@
 import {App, MessageShortcut, UsersSelectAction} from '@slack/bolt';
 import {WebClient} from '@slack/web-api';
-import {Actions, Header, Input, Message, Modal, Section, TextInput, UserSelect} from 'slack-block-builder';
+import {Actions, BlockCollection, Header, Input, Message, Modal, Option, Section, StaticSelect, TextInput, UserSelect} from 'slack-block-builder';
+
+// Utilities
 import {getInfo} from './util/sheets';
 import {capitalize, parseCellPhone} from './util/parsing';
 import { signingSecret, token, port } from './config';
@@ -127,37 +129,78 @@ app.command('/help', async ({ack, respond}) => {
                 Section().fields(
                     '*/help*\nSends info about other commands.',
                     '*/info @[user]?*\nGets the contact info of a given user.'
+                ),
+                Section().fields(
+                    '*/submit-feedback*\nSubmits feedback about the slack bot.'
                 )
             )
             .buildToObject()
     );
 });
 
-app.command('/modaltest', async ({ack, client, payload}) => {
+// /submit-feedback
+// Submits feedback about the slack bot.
+app.command('/submit-feedback', async ({ack, client, payload}) => {
     await ack();
-    const modal = Modal({title: 'This is a modal.', submit: 'Submit', callbackId: 'test-modal'})
+
+    const feedbackTypes = [
+        Option({text: 'Feature suggestion', value: 'feature_suggestion'}),
+        Option({text: 'Feature feedback', value: 'feature_feedback'}),
+        Option({text: 'Bug report', value: 'bug_report'})
+    ];
+
+    const modal = Modal({title: 'SEC Slack Bot Feedback', submit: 'Submit', callbackId: 'feedback-modal'})
         .blocks(
-            Section({text: 'Please input your personal information so that your data may be harvested.'}),
-            Input({label: 'Name', blockId: 'name-input'})
-                .element(TextInput({actionId: 'name-action', placeholder: 'John Doe'}))
+            Section({text: 'Please select what type of feedback to give, what feature your feedback concerns, and a brief description of your suggestion.'}),
+            Input({label: 'Feedback type', blockId: 'type-select'})
+                .element(StaticSelect({actionId: 'type-action', placeholder: 'Select a feedback type'})
+                    .options(feedbackTypes)
+                    .initialOption(feedbackTypes[0]))
                 .optional(false),
-            Input({label: 'Email address', blockId: 'email-input'})
-                .element(TextInput({actionId: 'email-action', placeholder: 'example@gmail.com'}))
+            Input({label: 'Feature name', blockId: 'name-input'})
+                .element(TextInput({actionId: 'name-action', placeholder: 'The feature your feedback concerns.'}))
                 .optional(false),
-            Input({label: 'Phone number', blockId: 'phone-input'})
-                .element(TextInput({actionId: 'phone-action', placeholder: '(650)-000-0000'}))
-                .optional(true)
+            Input({label: 'Feedback description', blockId: 'desc-input'})
+                .element(TextInput({actionId: 'desc-action', placeholder: 'A brief description of your feedback.'})
+                    .multiline(true))
+                .optional(false)
         )
         .buildToObject();
     await client.views.open({trigger_id: payload.trigger_id, view: modal});
 });
 
-app.view('test-modal', async ({ack, view}) => {
-    await ack();
+app.view('feedback-modal', async ({ack, client, body, view}) => {
+    // Update feedback modal with close message
+    await ack({
+        response_action: 'update',
+        view: Modal({title: 'SEC Slack Bot Feedback'})
+            .blocks(
+                Header({text: 'Your feedback was successfully submitted.'}),
+                Section({text: 'This modal can be safely closed. Have a nice day!'})
+            )
+            .buildToObject()
+    });
+
+    // Log feedback with relevant persons
+    const type = view.state.values['type-select']['type-action'].selected_option?.value;
     const name = view.state.values['name-input']['name-action'].value;
-    const email = view.state.values['email-input']['email-action'].value;
-    const phone = view.state.values['phone-input']['phone-action'].value;
-    console.log(`Received: name=${name} email=${email} phone=${phone}`)
+    const desc = view.state.values['desc-input']['desc-action'].value;
+
+    const users = ['U03GQC0A9MJ', 'U03GFNM1XA6']; // Kevin Yu, Ethan Liang
+    const res = await client.conversations.open({users: users.join(',')});
+    if (!res.ok || !res.channel?.id) return;
+
+    const blocks = BlockCollection(
+        Header({text: `${body.user.name} submitted a new ${type}`}),
+        Section({text: `*Name:* ${name}`}),
+        Section({text: `*Desc:* ${desc}`})
+    );
+
+    await client.chat.postMessage({
+        channel: res.channel.id,
+        blocks,
+        text: `${body.user.name} submitted a new ${type}`
+    });
 });
 
 ;(async () => {

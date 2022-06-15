@@ -22,6 +22,7 @@ This bot requires the following scopes:
 - `commands` to add and receive slash command interactions
 - `chat:write` to send messages
 - `users:read` to extract `user.real_name` from `command.user_id`
+- `channels:manage`, `groups:write`, `im:write`, and `mpim:write` to create and send messages in DMs and group DMs
 
 ### Google
 To use the sheets API, create a [Google cloud project](https://console.cloud.google.com) and enable the [Google Sheets
