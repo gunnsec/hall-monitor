@@ -138,30 +138,31 @@ app.command('/help', async ({ack, respond}) => {
     );
 });
 
-// /submit-feedback
-// Submits feedback about the slack bot.
-app.command('/submit-feedback', async ({ack, client, payload}) => {
+// /tech-request
+// Request a feature on a website or bot.
+app.command('/tech-request', async ({ack, client, payload}) => {
     await ack();
 
-    const feedbackTypes = [
-        Option({text: 'Feature suggestion', value: 'feature_suggestion'}),
-        Option({text: 'Feature feedback', value: 'feature_feedback'}),
-        Option({text: 'Bug report', value: 'bug_report'})
+    const scopes = [
+        Option({text: 'SEC website (gunnsec.org)', value: 'sec_weebly_site'}),
+        Option({text: 'SEC events website (events.gunnsec.org)', value: 'sec_events_site'}),
+        Option({text: 'SEC slack bot', value: 'slack_bot'}),
+        Option({text: 'Other', value: 'other'})
     ];
 
-    const modal = Modal({title: 'SEC Slack Bot Feedback', submit: 'Submit', callbackId: 'feedback-modal'})
+    const modal = Modal({title: 'SEC Tech Request', submit: 'Submit', callbackId: 'request-modal'})
         .blocks(
-            Section({text: 'Please select what type of feedback to give, what feature your feedback concerns, and a brief description of your suggestion.'}),
-            Input({label: 'Feedback type', blockId: 'type-select'})
-                .element(StaticSelect({actionId: 'type-action', placeholder: 'Select a feedback type'})
-                    .options(feedbackTypes)
-                    .initialOption(feedbackTypes[0]))
+            Section({text: 'Please select what scope your request falls under, the name of your request, and a brief description of what you\'re requesting.'}),
+            Input({label: 'Scope', blockId: 'scope-select'})
+                .element(StaticSelect({actionId: 'scope-action', placeholder: 'Select a scope'})
+                    .options(scopes)
+                    .initialOption(scopes[0]))
                 .optional(false),
-            Input({label: 'Feature name', blockId: 'name-input'})
-                .element(TextInput({actionId: 'name-action', placeholder: 'The feature your feedback concerns.'}))
+            Input({label: 'Request name', blockId: 'name-input'})
+                .element(TextInput({actionId: 'name-action', placeholder: 'The name of your request.'}))
                 .optional(false),
-            Input({label: 'Feedback description', blockId: 'desc-input'})
-                .element(TextInput({actionId: 'desc-action', placeholder: 'A brief description of your feedback.'})
+            Input({label: 'Request description', blockId: 'desc-input'})
+                .element(TextInput({actionId: 'desc-action', placeholder: 'A brief description of your request.'})
                     .multiline(true))
                 .optional(false)
         )
@@ -169,20 +170,20 @@ app.command('/submit-feedback', async ({ack, client, payload}) => {
     await client.views.open({trigger_id: payload.trigger_id, view: modal});
 });
 
-app.view('feedback-modal', async ({ack, client, body, view}) => {
+app.view('request-modal', async ({ack, client, body, view}) => {
     // Update feedback modal with close message
     await ack({
         response_action: 'update',
-        view: Modal({title: 'SEC Slack Bot Feedback'})
+        view: Modal({title: 'SEC Tech Request'})
             .blocks(
-                Header({text: 'Your feedback was successfully submitted.'}),
+                Header({text: 'Your request was successfully submitted.'}),
                 Section({text: 'This modal can be safely closed. Have a nice day!'})
             )
             .buildToObject()
     });
 
     // Log feedback with relevant persons
-    const type = view.state.values['type-select']['type-action'].selected_option?.value;
+    const scope = view.state.values['scope-select']['scope-action'].selected_option?.value;
     const name = view.state.values['name-input']['name-action'].value;
     const desc = view.state.values['desc-input']['desc-action'].value;
 
@@ -191,15 +192,15 @@ app.view('feedback-modal', async ({ack, client, body, view}) => {
     if (!res.ok || !res.channel?.id) return;
 
     const blocks = BlockCollection(
-        Header({text: `${body.user.name} submitted a new ${type}`}),
+        Header({text: `${body.user.name} submitted a request for ${scope}:`}),
         Section({text: `*Name:* ${name}`}),
-        Section({text: `*Desc:* ${desc}`})
+        Section({text: `*Description:* ${desc}`})
     );
 
     await client.chat.postMessage({
         channel: res.channel.id,
         blocks,
-        text: `${body.user.name} submitted a new ${type}`
+        text: `${body.user.name} submitted a request for ${scope}.`
     });
 });
 
